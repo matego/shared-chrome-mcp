@@ -1,0 +1,14 @@
+{
+  "name": "shared-agent-browser",
+  "description": "The shared-agent-browser plugin: one logged-in Chrome for all your agents.",
+  "owner": {
+    "name": "shared-agent-browser"
+  },
+  "plugins": [
+    {
+      "name": "shared-agent-browser",
+      "source": "./",
+      "description": "One always-on, logged-in Chrome shared by every agent on the machine: a window per session, a readiness wait after every action, logins that stay."
+    }
+  ]
+}

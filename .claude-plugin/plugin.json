@@ -1,0 +1,12 @@
+{
+  "name": "shared-agent-browser",
+  "version": "0.1.0",
+  "description": "One always-on, logged-in Chrome shared by every agent on the machine: a window per session, a readiness wait after every action, logins that stay.",
+  "keywords": [
+    "browser",
+    "chrome",
+    "playwright",
+    "mcp",
+    "agents"
+  ]
+}
