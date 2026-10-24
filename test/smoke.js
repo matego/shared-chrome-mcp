@@ -1,7 +1,8 @@
 // Smoke test: a throwaway Chrome on a test port, two MCP sessions at once, then shut down only what it started.
 // Usage: npm run smoke (port 9333 unless SMOKE_PORT is set).
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +13,8 @@ const { chromium } = createRequire(import.meta.resolve('@playwright/mcp'))('play
 const PORT = Number(process.env.SMOKE_PORT ?? 9333);
 if (PORT === 9222) throw new Error('Refusing to test on 9222: that is where a real shared Chrome usually runs.');
 const CLI = fileURLToPath(new URL('../cli.js', import.meta.url));
-const profile = mkdtempSync('/tmp/shared-agent-browser-smoke-');
+const work = mkdtempSync('/tmp/shared-agent-browser-smoke-');
+const profile = join(work, 'profile');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const PAGES = {
@@ -23,6 +25,7 @@ const PAGES = {
   '/busy': `<title>busy</title><p id="n">0</p><script>setInterval(() => n.textContent++, 100);</script>`,
   '/plain': `<title>plain</title><h1>Plain page</h1><a href="/popup-target" target="_blank">Open popup</a>`,
   '/popup-target': `<title>popup</title><h1>Popup page</h1>`,
+  '/dialog': `<title>dialog</title><button onclick="alert('hi')">Say hi</button>`,
 };
 const site = createServer(async (req, res) => {
   const path = new URL(req.url, 'http://x').pathname;
@@ -34,8 +37,10 @@ await new Promise(resolve => site.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${site.address().port}`;
 
 const results = [];
-const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` - ${detail}` : ''}`); };
+const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` - ${ok ? detail.slice(0, 120) : detail}` : ''}`); };
 const text = r => r.content.filter(p => p.type === 'text').map(p => p.text).join('\n');
+// Playwright MCP writes an action's snapshot to a file, relative to the server's cwd, and links it.
+const snapshot = (r, session) => { const file = text(r).match(/^- \[Snapshot\]\((.+)\)$/m)?.[1]; return file ? readFileSync(join(work, session, file), 'utf8') : text(r); };
 
 const chrome = spawn(process.execPath, [CLI, 'start', '--port', String(PORT), '--profile', profile], { stdio: ['ignore', 'inherit', 'inherit'] });
 let observer;
@@ -48,12 +53,14 @@ try {
   }
   observer = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
   const context = observer.contexts()[0];
+  context.on('dialog', () => {}); // or this observer would dismiss the sessions' dialogs
   const pageAt = url => context.pages().find(p => p.url() === url);
   const windowOf = async page => (await (await context.newCDPSession(page)).send('Browser.getWindowForTarget')).windowId;
 
-  const connect = async name => {
+  const connect = async (name, port = PORT) => {
     const client = new Client({ name, version: '0' });
-    await client.connect(new StdioClientTransport({ command: process.execPath, args: [CLI, '--port', String(PORT)], stderr: 'inherit' }));
+    mkdirSync(join(work, name)); // a project folder of its own, as agents usually have
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [CLI, '--port', String(port)], cwd: join(work, name), stderr: 'inherit' }));
     sessions.push(client);
     return client;
   };
@@ -75,17 +82,25 @@ try {
   const viaMcp = await Promise.all([a, b].map(c => call(c, 'browser_evaluate', { function: '() => location.pathname + " hidden=" + document.hidden' })));
   check('each session evaluates in its own page', text(viaMcp[0]).includes('/slow hidden=false') && text(viaMcp[1]).includes('/plain hidden=false'));
 
-  check('readiness wait: navigate returns the late content', /Ready after \d+ ms/.test(text(navA)) && text(navA).includes('Loaded late') && !text(navA).includes('Loading...'),
+  check('readiness wait: navigate returns the late content', /Ready after \d+ ms/.test(text(navA)) && snapshot(navA, 'agent-a').includes('Loaded late') && !snapshot(navA, 'agent-a').includes('Loading...'),
     text(navA).match(/### Page readiness\n.*/)?.[0].replace('\n', ' '));
   check('readiness wait: a quick page is ready too', /Ready after/.test(text(navB)));
 
   const tabsA = text(await call(a, 'browser_tabs', { action: 'list' }));
   check('a session lists only its own tabs', tabsA.includes('/slow') && !tabsA.includes('/plain') && !tabsA.includes('about:blank'), tabsA.replace(/\n/g, ' | ').slice(0, 200));
 
-  const ref = text(navB).match(/link "Open popup" \[ref=(\w+)\]/)?.[1];
+  const ref = snapshot(navB, 'agent-b').match(/link "Open popup" \[ref=(\w+)\]/)?.[1];
   const clicked = await call(b, 'browser_click', { element: 'Open popup link', target: ref });
   const tabsB = text(await call(b, 'browser_tabs', { action: 'list' }));
-  check('a popup opened from a session page joins that session', tabsB.includes('/popup-target') && tabsB.includes('/plain') && !clicked.isError, tabsB.replace(/\n/g, ' | ').slice(0, 200));
+  check('a popup opened from a session page joins that session', tabsB.includes('/popup-target') && tabsB.includes('/plain') && !clicked.isError,
+    `ref ${ref}; ${tabsB.replace(/\n/g, ' | ').slice(0, 200)}; click: ${text(clicked).replace(/\n/g, ' | ').slice(0, 400)}`);
+
+  const dialogPage = await call(a, 'browser_navigate', { url: `${base}/dialog` });
+  const button = snapshot(dialogPage, 'agent-a').match(/button "Say hi" \[ref=(\w+)\]/)?.[1];
+  const opened = await call(a, 'browser_click', { element: 'Say hi button', target: button });
+  const accepted = await call(a, 'browser_handle_dialog', { accept: true });
+  check('a click that opens a dialog returns the dialog, no readiness wait', text(opened).includes('### Modal state') && !text(opened).includes('Page readiness') && !accepted.isError,
+    `${text(opened).replace(/\n/g, ' | ').slice(0, 300)} || accept: ${text(accepted).slice(0, 100)}`);
 
   const busy = await call(a, 'browser_navigate', { url: `${base}/busy` });
   check('a page that never settles comes back NOT READY', text(busy).includes('NOT READY'), text(busy).match(/NOT READY.*/)?.[0].slice(0, 120));
@@ -98,6 +113,10 @@ try {
   check('closing session A closes its window', !pageAt(`${base}/busy`));
   const stillB = await call(b, 'browser_evaluate', { function: '() => location.pathname' });
   check('session B is intact after A closed', !stillB.isError && !!pageAt(`${base}/plain`), text(stillB).match(/### Result\n.*/)?.[0].replace('\n', ' '));
+
+  const nowhere = await connect('agent-c', PORT + 1);
+  const down = await call(nowhere, 'browser_navigate', { url: `${base}/plain` });
+  check('without Chrome a call says so plainly', down.isError && text(down).includes('No Chrome on'), text(down).match(/No Chrome on.*/)?.[0].slice(0, 80));
 } catch (error) {
   check('smoke test ran to the end', false, error.stack);
 } finally {
@@ -107,7 +126,7 @@ try {
   chrome.kill('SIGTERM');
   await Promise.race([exited, sleep(15000)]);
   site.close();
-  rmSync(profile, { recursive: true, force: true });
+  rmSync(work, { recursive: true, force: true });
 }
 
 const failed = results.filter(ok => !ok).length;
