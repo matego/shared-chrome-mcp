@@ -1,0 +1,115 @@
+// Smoke test: a throwaway Chrome on a test port, two MCP sessions at once, then shut down only what it started.
+// Usage: npm run smoke (port 9333 unless SMOKE_PORT is set).
+import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+
+const { chromium } = createRequire(import.meta.resolve('@playwright/mcp'))('playwright-core');
+const PORT = Number(process.env.SMOKE_PORT ?? 9333);
+if (PORT === 9222) throw new Error('Refusing to test on 9222: that is where a real shared Chrome usually runs.');
+const CLI = fileURLToPath(new URL('../cli.js', import.meta.url));
+const profile = mkdtempSync('/tmp/shared-agent-browser-smoke-');
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+const PAGES = {
+  // Content arrives 1.5 s after load, behind a visible spinner: only a real readiness wait sees it.
+  '/slow': `<title>slow</title><div class="loading">Loading...</div><script>
+    setTimeout(async () => { document.body.innerHTML = '<h1>' + await (await fetch('/data')).text() + '</h1>'; }, 1500);</script>`,
+  // The DOM never stops changing: must come back NOT READY.
+  '/busy': `<title>busy</title><p id="n">0</p><script>setInterval(() => n.textContent++, 100);</script>`,
+  '/plain': `<title>plain</title><h1>Plain page</h1><a href="/popup-target" target="_blank">Open popup</a>`,
+  '/popup-target': `<title>popup</title><h1>Popup page</h1>`,
+};
+const site = createServer(async (req, res) => {
+  const path = new URL(req.url, 'http://x').pathname;
+  if (path === '/data') { await sleep(500); return res.end('Loaded late'); }
+  res.setHeader('content-type', 'text/html');
+  res.end(PAGES[path] ?? 'not found');
+});
+await new Promise(resolve => site.listen(0, '127.0.0.1', resolve));
+const base = `http://127.0.0.1:${site.address().port}`;
+
+const results = [];
+const check = (name, ok, detail = '') => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ` - ${detail}` : ''}`); };
+const text = r => r.content.filter(p => p.type === 'text').map(p => p.text).join('\n');
+
+const chrome = spawn(process.execPath, [CLI, 'start', '--port', String(PORT), '--profile', profile], { stdio: ['ignore', 'inherit', 'inherit'] });
+let observer;
+const sessions = [];
+
+try {
+  for (let i = 0; i < 60; i++) {
+    if (await fetch(`http://127.0.0.1:${PORT}/json/version`).then(() => true, () => false)) break;
+    await sleep(500);
+  }
+  observer = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
+  const context = observer.contexts()[0];
+  const pageAt = url => context.pages().find(p => p.url() === url);
+  const windowOf = async page => (await (await context.newCDPSession(page)).send('Browser.getWindowForTarget')).windowId;
+
+  const connect = async name => {
+    const client = new Client({ name, version: '0' });
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [CLI, '--port', String(PORT)], stderr: 'inherit' }));
+    sessions.push(client);
+    return client;
+  };
+  const [a, b] = await Promise.all([connect('agent-a'), connect('agent-b')]);
+  const call = (client, name, args = {}) => client.callTool({ name, arguments: args }, undefined, { timeout: 120000 });
+
+  const started = Date.now();
+  const [navA, navB] = await Promise.all([
+    call(a, 'browser_navigate', { url: `${base}/slow` }),
+    call(b, 'browser_navigate', { url: `${base}/plain` }),
+  ]);
+  console.log(`both navigations took ${Date.now() - started} ms`);
+
+  const slow = pageAt(`${base}/slow`), plain = pageAt(`${base}/plain`);
+  const [winA, winB, winFirst] = await Promise.all([windowOf(slow), windowOf(plain), windowOf(context.pages()[0])]);
+  check('each session got its own window', winA !== winB && winA !== winFirst && winB !== winFirst, `windows ${winA}, ${winB}, Chrome's first window ${winFirst}`);
+  const hidden = await Promise.all([slow, plain].map(p => p.evaluate(() => document.hidden)));
+  check('both pages report document.hidden === false', hidden.every(h => h === false), `hidden: ${hidden}`);
+  const viaMcp = await Promise.all([a, b].map(c => call(c, 'browser_evaluate', { function: '() => location.pathname + " hidden=" + document.hidden' })));
+  check('each session evaluates in its own page', text(viaMcp[0]).includes('/slow hidden=false') && text(viaMcp[1]).includes('/plain hidden=false'));
+
+  check('readiness wait: navigate returns the late content', /Ready after \d+ ms/.test(text(navA)) && text(navA).includes('Loaded late') && !text(navA).includes('Loading...'),
+    text(navA).match(/### Page readiness\n.*/)?.[0].replace('\n', ' '));
+  check('readiness wait: a quick page is ready too', /Ready after/.test(text(navB)));
+
+  const tabsA = text(await call(a, 'browser_tabs', { action: 'list' }));
+  check('a session lists only its own tabs', tabsA.includes('/slow') && !tabsA.includes('/plain') && !tabsA.includes('about:blank'), tabsA.replace(/\n/g, ' | ').slice(0, 200));
+
+  const ref = text(navB).match(/link "Open popup" \[ref=(\w+)\]/)?.[1];
+  const clicked = await call(b, 'browser_click', { element: 'Open popup link', target: ref });
+  const tabsB = text(await call(b, 'browser_tabs', { action: 'list' }));
+  check('a popup opened from a session page joins that session', tabsB.includes('/popup-target') && tabsB.includes('/plain') && !clicked.isError, tabsB.replace(/\n/g, ' | ').slice(0, 200));
+
+  const busy = await call(a, 'browser_navigate', { url: `${base}/busy` });
+  check('a page that never settles comes back NOT READY', text(busy).includes('NOT READY'), text(busy).match(/NOT READY.*/)?.[0].slice(0, 120));
+
+  const logout = await call(b, 'browser_click', { element: 'Sign out button', target: 'e1' });
+  check('logging out is refused', logout.isError && text(logout).includes('Refused'));
+
+  await a.close();
+  for (let i = 0; i < 40 && pageAt(`${base}/busy`); i++) await sleep(250);
+  check('closing session A closes its window', !pageAt(`${base}/busy`));
+  const stillB = await call(b, 'browser_evaluate', { function: '() => location.pathname' });
+  check('session B is intact after A closed', !stillB.isError && !!pageAt(`${base}/plain`), text(stillB).match(/### Result\n.*/)?.[0].replace('\n', ' '));
+} catch (error) {
+  check('smoke test ran to the end', false, error.stack);
+} finally {
+  await Promise.all(sessions.map(s => s.close().catch(() => {})));
+  await observer?.close().catch(() => {});
+  const exited = new Promise(resolve => chrome.once('exit', resolve));
+  chrome.kill('SIGTERM');
+  await Promise.race([exited, sleep(15000)]);
+  site.close();
+  rmSync(profile, { recursive: true, force: true });
+}
+
+const failed = results.filter(ok => !ok).length;
+console.log(failed ? `${failed} of ${results.length} checks failed` : `all ${results.length} checks passed`);
+process.exit(failed ? 1 : 0);

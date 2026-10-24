@@ -1,0 +1,21 @@
+{
+  "name": "shared-agent-browser",
+  "version": "0.1.0",
+  "description": "One always-on, logged-in Chrome shared by any number of AI agents: a window per agent, a readiness wait after every action, an MCP server and a Claude Code plugin.",
+  "keywords": ["mcp", "playwright", "chrome", "browser", "agents", "claude-code", "codex"],
+  "type": "module",
+  "bin": {
+    "shared-agent-browser": "cli.js"
+  },
+  "files": ["cli.js", "lib/"],
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "smoke": "node test/smoke.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "@playwright/mcp": "0.0.83"
+  }
+}
