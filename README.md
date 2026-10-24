@@ -1,0 +1,69 @@
+> **Draft.** The wording here will be rewritten before release.
+
+# shared-agent-browser
+
+One Chrome that stays on and stays logged in, shared by all your agents at once: Claude Code, Codex, Cursor, Claude Desktop, anything that speaks MCP.
+
+You log in to a site once, or let the agent do it, and every agent can use that login from then on. The agent logs in by itself when a site asks; nothing stops at the login page and waits for you.
+
+## Why not just Playwright MCP
+
+This is stock [Playwright MCP](https://github.com/microsoft/playwright-mcp) attached to one Chrome over CDP, plus the rules we learned the hard way, enforced by the server so agents don't have to remember them:
+
+- **A window per agent, not a tab.** A background tab reports `document.hidden`, gets throttled, and bot checks flag it. Each MCP session gets its own window on first use and only ever sees its own tabs, so ten agents can work side by side without landing in each other's pages.
+- **Waits until the page is ready.** After navigate, click, back, select or key press, it waits for load, network idle, no visible spinners and one second without DOM changes (20 s at most), then returns a fresh snapshot. If the page never settles, the result says `NOT READY` plainly instead of handing back a half-loaded page.
+- **Logins stay.** Cookies are shared, so the server refuses obvious logout clicks and URLs. Closing a session closes its windows and nothing else.
+- **Always on.** On macOS a launchd agent keeps Chrome running across crashes and reboots.
+
+Alternatives: [agent-browser](https://github.com/vercel-labs/agent-browser) (a driver that pins each session to a tab) and [BrowserOS neo](https://github.com/browseros-ai/BrowserOS) (a separate browser app for agents).
+
+## Start Chrome
+
+Needs Node.js 20.11+ and Google Chrome.
+
+```sh
+npx shared-agent-browser install   # macOS: launchd keeps it running
+npx shared-agent-browser start     # or run it in the foreground (any OS)
+npx shared-agent-browser status
+```
+
+Chrome opens on its own profile (`~/.shared-agent-browser/profile`) with CDP on `127.0.0.1:9222`. Log in there to the sites you want agents to use, or leave that to the agents. Change the port or profile with `--port` / `--profile` (or `SHARED_AGENT_BROWSER_PORT` / `SHARED_AGENT_BROWSER_PROFILE`), the same for every command and for the MCP server. `uninstall` removes the launchd agent and keeps the profile.
+
+On macOS, links from other apps open in the oldest running Chrome. If they start landing in the agents' Chrome, install with `--owner-chrome-first`: it starts your own Chrome first and restarts the agents' one whenever yours restarts.
+
+## Claude Code
+
+The repo is a plugin and its own marketplace:
+
+```
+/plugin marketplace add <owner>/shared-agent-browser
+/plugin install shared-agent-browser@shared-agent-browser
+```
+
+You get the MCP server, a skill with the rules the server cannot enforce (payments, downloads, parallel agents, what to do when Chrome is down), and a hook that blocks Claude in Chrome, which refuses to log in anywhere.
+
+## Codex, Cursor, Claude Desktop and others
+
+Add it as a stdio MCP server. Codex, in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.browser]
+command = "npx"
+args = ["-y", "shared-agent-browser"]
+```
+
+Cursor, Claude Desktop and most others:
+
+```json
+{ "mcpServers": { "browser": { "command": "npx", "args": ["-y", "shared-agent-browser"] } } }
+```
+
+Each client process is one session with its own window. Subagents inside one session share it, so run one browser subagent at a time, or separate sessions in parallel.
+
+## Security
+
+The CDP port hands the whole logged-in profile to any process on this machine: every cookie and every session, no password asked. Chrome listens on 127.0.0.1 only. Never forward or expose the port, and run this only on a machine where you trust everything that runs. Playwright MCP's `browser_run_code_unsafe` tool, kept here, runs arbitrary code in the server process.
+
+## Test
+
+`npm run smoke` starts a throwaway Chrome on port 9333, connects two MCP sessions at once and checks the windows, visibility, readiness wait and cleanup.
