@@ -27,7 +27,7 @@ npx shared-agent-browser start     # or run it in the foreground (any OS)
 npx shared-agent-browser status
 ```
 
-Chrome opens on its own profile (`~/.shared-agent-browser/profile`) with CDP on `127.0.0.1:9222`. Log in there to the sites you want agents to use, or leave that to the agents. Change the port or profile with `--port` / `--profile` (or `SHARED_AGENT_BROWSER_PORT` / `SHARED_AGENT_BROWSER_PROFILE`), the same for every command and for the MCP server. `uninstall` removes the launchd agent and keeps the profile.
+Chrome opens on its own profile (`~/.shared-agent-browser/profile`) with CDP on `127.0.0.1:9222`. Log in there to the sites you want agents to use, or leave that to the agents. Change the port or profile with `--port` / `--profile` (or `SHARED_AGENT_BROWSER_PORT` / `SHARED_AGENT_BROWSER_PROFILE`), the same for every command and for the MCP server. `uninstall` removes the launchd agent and keeps the profile. `install` points launchd at the copy of the package it ran from, so run it again after an update.
 
 On macOS, links from other apps open in the oldest running Chrome. If they start landing in the agents' Chrome, install with `--owner-chrome-first`: it starts your own Chrome first and restarts the agents' one whenever yours restarts.
 
@@ -66,4 +66,4 @@ The CDP port hands the whole logged-in profile to any process on this machine: e
 
 ## Test
 
-`npm run smoke` starts a throwaway Chrome on port 9333, connects two MCP sessions at once and checks the windows, visibility, readiness wait and cleanup.
+`npm run smoke` starts a throwaway Chrome on port 9333, connects two MCP sessions at once and checks the windows, visibility, readiness wait, popups, dialogs and cleanup.
