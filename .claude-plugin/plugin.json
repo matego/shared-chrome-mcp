@@ -1,6 +1,5 @@
 {
-  "name": "shared-agent-browser",
-  "version": "0.1.0",
+  "name": "shared-chrome-mcp",
   "description": "One always-on, logged-in Chrome shared by every agent on the machine: a window per session, a readiness wait after every action, logins that stay.",
   "keywords": [
     "browser",
@@ -13,7 +12,7 @@
     "name": "Zucchini",
     "url": "https://zucchini.chat"
   },
-  "homepage": "https://github.com/zucchini-chat/shared-agent-browser",
-  "repository": "https://github.com/zucchini-chat/shared-agent-browser",
+  "homepage": "https://github.com/zucchini-chat/shared-chrome-mcp",
+  "repository": "https://github.com/zucchini-chat/shared-chrome-mcp",
   "license": "MIT"
 }

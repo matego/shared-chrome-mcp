@@ -13,7 +13,7 @@ const { chromium } = createRequire(import.meta.resolve('@playwright/mcp'))('play
 const PORT = Number(process.env.SMOKE_PORT ?? 9333);
 if (PORT === 9222) throw new Error('Refusing to test on 9222: that is where a real shared Chrome usually runs.');
 const CLI = fileURLToPath(new URL('../cli.js', import.meta.url));
-const work = mkdtempSync('/tmp/shared-agent-browser-smoke-');
+const work = mkdtempSync('/tmp/shared-chrome-mcp-smoke-');
 const profile = join(work, 'profile');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 

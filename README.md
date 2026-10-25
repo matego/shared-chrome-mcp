@@ -1,6 +1,4 @@
-> **Draft.** The wording here will be rewritten before release.
-
-# shared-agent-browser
+# shared-chrome-mcp
 
 One Chrome that stays on and stays logged in, shared by all your agents at once: Claude Code, Codex, Cursor, Claude Desktop, anything that speaks MCP.
 
@@ -23,12 +21,12 @@ Alternatives: [agent-browser](https://github.com/vercel-labs/agent-browser) (a d
 Needs Node.js 20.11+ and Google Chrome.
 
 ```sh
-npx -y github:zucchini-chat/shared-agent-browser install   # macOS: launchd keeps it running
-npx -y github:zucchini-chat/shared-agent-browser start     # or run it in the foreground (any OS)
-npx -y github:zucchini-chat/shared-agent-browser status
+npx -y github:zucchini-chat/shared-chrome-mcp install   # macOS: launchd keeps it running
+npx -y github:zucchini-chat/shared-chrome-mcp start     # or run it in the foreground (any OS)
+npx -y github:zucchini-chat/shared-chrome-mcp status
 ```
 
-Chrome opens on its own profile (`~/.shared-agent-browser/profile`) with CDP on `127.0.0.1:9222`. Log in there to the sites you want agents to use, or leave that to the agents. Change the port or profile with `--port` / `--profile` (or `SHARED_AGENT_BROWSER_PORT` / `SHARED_AGENT_BROWSER_PROFILE`), the same for every command and for the MCP server. `uninstall` removes the launchd agent and keeps the profile. `install` points launchd at the copy of the package it ran from, so run it again after an update.
+Chrome opens on its own profile (`~/.shared-chrome-mcp/profile`) with CDP on `127.0.0.1:9222`. Log in there to the sites you want agents to use, or leave that to the agents. Change the port or profile with `--port` / `--profile` (or `SHARED_CHROME_MCP_PORT` / `SHARED_CHROME_MCP_PROFILE`), the same for every command and for the MCP server. `uninstall` removes the launchd agent and keeps the profile. `install` points launchd at the copy of the package it ran from, so run it again after an update.
 
 On macOS, links from other apps open in the oldest running Chrome. If they start landing in the agents' Chrome, install with `--owner-chrome-first`: it starts your own Chrome first and restarts the agents' one whenever yours restarts.
 
@@ -37,11 +35,11 @@ On macOS, links from other apps open in the oldest running Chrome. If they start
 The repo is a plugin and its own marketplace:
 
 ```
-/plugin marketplace add zucchini-chat/shared-agent-browser
-/plugin install shared-agent-browser@shared-agent-browser
+/plugin marketplace add zucchini-chat/shared-chrome-mcp
+/plugin install shared-chrome-mcp@shared-chrome-mcp
 ```
 
-Claude Code installs the two dependencies from `package-lock.json` as part of the plugin install. You get the MCP server, a skill with the rules the server cannot enforce (payments, downloads, parallel agents, what to do when Chrome is down), and a hook that blocks Claude in Chrome, which refuses to log in anywhere.
+Claude Code installs the two dependencies from `package-lock.json` as part of the plugin install. The plugin has no version number, so it follows this repo's commits: `/plugin marketplace update shared-chrome-mcp` brings the latest, or turn on auto-update for the marketplace under `/plugin` > Marketplaces. You get the MCP server, a skill with the rules the server cannot enforce (payments, downloads, parallel agents, what to do when Chrome is down), and a hook that blocks Claude in Chrome, which refuses to log in anywhere.
 
 ## Codex, Cursor, Claude Desktop and others
 
@@ -50,13 +48,13 @@ Add it as a stdio MCP server. Codex, in `~/.codex/config.toml`:
 ```toml
 [mcp_servers.browser]
 command = "npx"
-args = ["-y", "github:zucchini-chat/shared-agent-browser"]
+args = ["-y", "github:zucchini-chat/shared-chrome-mcp"]
 ```
 
 Cursor, Claude Desktop and most others:
 
 ```json
-{ "mcpServers": { "browser": { "command": "npx", "args": ["-y", "github:zucchini-chat/shared-agent-browser"] } } }
+{ "mcpServers": { "browser": { "command": "npx", "args": ["-y", "github:zucchini-chat/shared-chrome-mcp"] } } }
 ```
 
 Each client process is one session with its own window. Subagents inside one session share it, so run one browser subagent at a time, or separate sessions in parallel.

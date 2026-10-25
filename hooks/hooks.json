@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'Wrong browser: Claude in Chrome refuses to log in anywhere. Use the shared logged-in Chrome instead: the browser_* tools of the shared-agent-browser MCP server (rules: its shared-browser skill).' >&2; exit 2"
+            "command": "echo 'Wrong browser: Claude in Chrome refuses to log in anywhere. Use the shared logged-in Chrome instead: the browser_* tools of the shared-chrome-mcp MCP server (rules: its shared-browser skill).' >&2; exit 2"
           }
         ]
       }

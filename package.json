@@ -1,14 +1,14 @@
 {
-  "name": "shared-agent-browser",
+  "name": "shared-chrome-mcp",
   "version": "0.1.0",
   "description": "One always-on, logged-in Chrome shared by any number of AI agents: a window per agent, a readiness wait after every action, an MCP server and a Claude Code plugin.",
   "keywords": ["mcp", "playwright", "chrome", "browser", "agents", "claude-code", "codex"],
   "license": "MIT",
   "author": "Zucchini (https://zucchini.chat)",
-  "repository": "github:zucchini-chat/shared-agent-browser",
+  "repository": "github:zucchini-chat/shared-chrome-mcp",
   "type": "module",
   "bin": {
-    "shared-agent-browser": "cli.js"
+    "shared-chrome-mcp": "cli.js"
   },
   "files": ["cli.js", "lib/"],
   "engines": {

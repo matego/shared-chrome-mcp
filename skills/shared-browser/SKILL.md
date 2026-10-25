@@ -1,6 +1,6 @@
 ---
 name: shared-browser
-description: Rules for the shared logged-in Chrome (the browser_* tools of the shared-agent-browser MCP server). Read before any browser work - logins, payments, downloads, popups, parallel agents, and what to do when Chrome is down.
+description: Rules for the shared logged-in Chrome (the browser_* tools of the shared-chrome-mcp MCP server). Read before any browser work - logins, payments, downloads, popups, parallel agents, and what to do when Chrome is down.
 ---
 
 # Shared browser
@@ -23,6 +23,6 @@ One Chrome, on its own profile, runs all the time and every agent on this machin
 A tool error says `No Chrome on http://127.0.0.1:<port>`. Never start a Chrome of your own on a guess: one on another profile has none of the logins.
 1. Find how this machine keeps the shared Chrome running (its setup notes, e.g. the repo's tools file) and restart it that way. The steps below are for this package's own keep-alive only.
 2. `node "${CLAUDE_PLUGIN_ROOT}/cli.js" status` shows whether Chrome is up and whether its launchd agent is installed.
-3. Installed (macOS): `launchctl kickstart -k gui/$(id -u)/shared-agent-browser`. Its log is the profile path plus `.log` (default `~/.shared-agent-browser/profile.log`).
-4. Not installed: start it in the background with `node "${CLAUDE_PLUGIN_ROOT}/cli.js" start`, and tell the human that `npx -y github:zucchini-chat/shared-agent-browser install` keeps it running for good.
+3. Installed (macOS): `launchctl kickstart -k gui/$(id -u)/shared-chrome-mcp`. Its log is the profile path plus `.log` (default `~/.shared-chrome-mcp/profile.log`).
+4. Not installed: start it in the background with `node "${CLAUDE_PLUGIN_ROOT}/cli.js" start`, and tell the human that `npx -y github:zucchini-chat/shared-chrome-mcp install` keeps it running for good.
 5. Your windows are gone after a restart; the next browser call opens a new one. If every site now shows logged out, Chrome was started some other way: it must run with the mock-keychain flags, which only `start` passes.
