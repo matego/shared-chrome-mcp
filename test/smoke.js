@@ -123,6 +123,11 @@ try {
   const stillB = await call(b, 'browser_evaluate', { function: '() => location.pathname' });
   check('session B is intact after A closed', !stillB.isError && !!pageAt(`${base}/plain`), text(stillB).match(/### Result\n.*/)?.[0].replace('\n', ' '));
 
+  const d = await connect('agent-d');
+  const before = context.pages().length;
+  const empty = await call(d, 'browser_tabs', { action: 'list' });
+  check('listing tabs with none open opens nothing', text(empty).includes('No open tabs') && context.pages().length === before, text(empty).replace(/\n/g, ' | '));
+
   const nowhere = await connect('agent-c', PORT + 1);
   const down = await call(nowhere, 'browser_navigate', { url: `${base}/plain` });
   check('without Chrome a call says so plainly', down.isError && text(down).includes('No Chrome on'), text(down).match(/No Chrome on.*/)?.[0].slice(0, 80));
