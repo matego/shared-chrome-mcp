@@ -108,9 +108,18 @@ try {
   const logout = await call(b, 'browser_click', { element: 'Sign out button', target: 'e1' });
   check('logging out is refused', logout.isError && text(logout).includes('Refused'));
 
+  await call(a, 'browser_tabs', { action: 'new' });
+  await call(a, 'browser_navigate', { url: `${base}/plain?handover` });
+  const handed = await call(a, 'browser_hand_over', { note: 'Solve the captcha' });
+  const tabsAfter = text(await call(a, 'browser_tabs', { action: 'list' }));
+  const handedTitle = await pageAt(`${base}/plain?handover`)?.title();
+  check('a handed-over window leaves the session, titled with the note', !handed.isError && !tabsAfter.includes('handover') && tabsAfter.includes('/busy') && handedTitle === 'Solve the captcha - plain',
+    `${text(handed).slice(0, 150)} | title ${handedTitle} | tabs ${tabsAfter.replace(/\n/g, ' | ').slice(0, 200)}`);
+
   await a.close();
   for (let i = 0; i < 40 && pageAt(`${base}/busy`); i++) await sleep(250);
   check('closing session A closes its window', !pageAt(`${base}/busy`));
+  check('the handed-over window outlives session A', !!pageAt(`${base}/plain?handover`));
   const stillB = await call(b, 'browser_evaluate', { function: '() => location.pathname' });
   check('session B is intact after A closed', !stillB.isError && !!pageAt(`${base}/plain`), text(stillB).match(/### Result\n.*/)?.[0].replace('\n', ' '));
 
