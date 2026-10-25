@@ -2,7 +2,8 @@
   "name": "shared-agent-browser",
   "description": "The shared-agent-browser plugin: one logged-in Chrome for all your agents.",
   "owner": {
-    "name": "shared-agent-browser"
+    "name": "Zucchini",
+    "url": "https://zucchini.chat"
   },
   "plugins": [
     {

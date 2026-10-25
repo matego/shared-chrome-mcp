@@ -23,9 +23,9 @@ Alternatives: [agent-browser](https://github.com/vercel-labs/agent-browser) (a d
 Needs Node.js 20.11+ and Google Chrome.
 
 ```sh
-npx shared-agent-browser install   # macOS: launchd keeps it running
-npx shared-agent-browser start     # or run it in the foreground (any OS)
-npx shared-agent-browser status
+npx -y github:zucchini-chat/shared-agent-browser install   # macOS: launchd keeps it running
+npx -y github:zucchini-chat/shared-agent-browser start     # or run it in the foreground (any OS)
+npx -y github:zucchini-chat/shared-agent-browser status
 ```
 
 Chrome opens on its own profile (`~/.shared-agent-browser/profile`) with CDP on `127.0.0.1:9222`. Log in there to the sites you want agents to use, or leave that to the agents. Change the port or profile with `--port` / `--profile` (or `SHARED_AGENT_BROWSER_PORT` / `SHARED_AGENT_BROWSER_PROFILE`), the same for every command and for the MCP server. `uninstall` removes the launchd agent and keeps the profile. `install` points launchd at the copy of the package it ran from, so run it again after an update.
@@ -37,11 +37,11 @@ On macOS, links from other apps open in the oldest running Chrome. If they start
 The repo is a plugin and its own marketplace:
 
 ```
-/plugin marketplace add <owner>/shared-agent-browser
+/plugin marketplace add zucchini-chat/shared-agent-browser
 /plugin install shared-agent-browser@shared-agent-browser
 ```
 
-You get the MCP server, a skill with the rules the server cannot enforce (payments, downloads, parallel agents, what to do when Chrome is down), and a hook that blocks Claude in Chrome, which refuses to log in anywhere.
+Claude Code installs the two dependencies from `package-lock.json` as part of the plugin install. You get the MCP server, a skill with the rules the server cannot enforce (payments, downloads, parallel agents, what to do when Chrome is down), and a hook that blocks Claude in Chrome, which refuses to log in anywhere.
 
 ## Codex, Cursor, Claude Desktop and others
 
@@ -50,13 +50,13 @@ Add it as a stdio MCP server. Codex, in `~/.codex/config.toml`:
 ```toml
 [mcp_servers.browser]
 command = "npx"
-args = ["-y", "shared-agent-browser"]
+args = ["-y", "github:zucchini-chat/shared-agent-browser"]
 ```
 
 Cursor, Claude Desktop and most others:
 
 ```json
-{ "mcpServers": { "browser": { "command": "npx", "args": ["-y", "shared-agent-browser"] } } }
+{ "mcpServers": { "browser": { "command": "npx", "args": ["-y", "github:zucchini-chat/shared-agent-browser"] } } }
 ```
 
 Each client process is one session with its own window. Subagents inside one session share it, so run one browser subagent at a time, or separate sessions in parallel.
@@ -67,4 +67,4 @@ The CDP port hands the whole logged-in profile to any process on this machine: e
 
 ## Test
 
-`npm run smoke` starts a throwaway Chrome on port 9333, connects two MCP sessions at once and checks the windows, visibility, readiness wait, popups, dialogs, hand-over and cleanup.
+From a checkout, after `npm install`: `npm run smoke` starts a throwaway Chrome on port 9333, connects two MCP sessions at once and checks the windows, visibility, readiness wait, popups, dialogs, hand-over and cleanup.

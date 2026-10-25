@@ -8,5 +8,12 @@
     "playwright",
     "mcp",
     "agents"
-  ]
+  ],
+  "author": {
+    "name": "Zucchini",
+    "url": "https://zucchini.chat"
+  },
+  "homepage": "https://github.com/zucchini-chat/shared-agent-browser",
+  "repository": "https://github.com/zucchini-chat/shared-agent-browser",
+  "license": "MIT"
 }
