@@ -1,6 +1,6 @@
 // Smoke test: a throwaway Chrome on a test port, two MCP sessions at once, then shut down only what it started.
 // Usage: npm run smoke (port 9333 unless SMOKE_PORT is set).
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { createServer } from 'node:http';
@@ -94,6 +94,10 @@ try {
   const tabsB = text(await call(b, 'browser_tabs', { action: 'list' }));
   check('a popup opened from a session page joins that session', tabsB.includes('/popup-target') && tabsB.includes('/plain') && !clicked.isError,
     `ref ${ref}; ${tabsB.replace(/\n/g, ' | ').slice(0, 200)}; click: ${text(clicked).replace(/\n/g, ' | ').slice(0, 400)}`);
+  // macOS lists a backgrounded process at scheduling priority 4. Under load such a renderer acks a click seconds late and the click times out.
+  const backgrounded = process.platform !== 'darwin' ? [] : execFileSync('ps', ['-axo', 'pri=,command='], { encoding: 'utf8' })
+    .split('\n').filter(line => line.includes(profile) && line.includes('--type=renderer') && /^\s*4\s/.test(line));
+  check('no renderer is backgrounded, not even the page under its popup tab', !backgrounded.length, `${backgrounded.length} at background priority`);
 
   const dialogPage = await call(a, 'browser_navigate', { url: `${base}/dialog` });
   const button = snapshot(dialogPage, 'agent-a').match(/button "Say hi" \[ref=(\w+)\]/)?.[1];

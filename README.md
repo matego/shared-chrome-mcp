@@ -65,4 +65,4 @@ The CDP port hands the whole logged-in profile to any process on this machine: e
 
 ## Test
 
-From a checkout, after `npm install`: `npm run smoke` starts a throwaway Chrome on port 9333, connects two MCP sessions at once and checks the windows, visibility, readiness wait, popups, dialogs, hand-over, reopening after browser_close and cleanup.
+From a checkout, after `npm install`: `npm run smoke` starts a throwaway Chrome on port 9333, connects two MCP sessions at once and checks the windows, visibility, renderer priority, readiness wait, popups, dialogs, hand-over, reopening after browser_close and cleanup.
