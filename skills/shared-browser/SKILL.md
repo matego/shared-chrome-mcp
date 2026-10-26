@@ -20,7 +20,7 @@ One Chrome, on its own profile, runs all the time and every agent on this machin
 
 ## Chrome is down
 
-A tool error says `No Chrome on http://127.0.0.1:<port>`. Never start a Chrome of your own on a guess: one on another profile has none of the logins.
+A tool error says `No Chrome on http://127.0.0.1:<port>`: nothing answers on that port. (`Chrome ... is up, but attaching to it failed` is not this: retry, never restart.) Never start a Chrome of your own on a guess: one on another profile has none of the logins.
 1. Find how this machine keeps the shared Chrome running (its setup notes, e.g. the repo's tools file) and restart it that way. The steps below are for this package's own keep-alive only.
 2. `node "${CLAUDE_PLUGIN_ROOT}/cli.js" status` shows whether Chrome is up and whether its launchd agent is installed.
 3. Installed (macOS): `launchctl kickstart -k gui/$(id -u)/shared-chrome-mcp`. Its log is the profile path plus `.log` (default `~/.shared-chrome-mcp/profile.log`).
