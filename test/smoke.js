@@ -123,6 +123,14 @@ try {
   const stillB = await call(b, 'browser_evaluate', { function: '() => location.pathname' });
   check('session B is intact after A closed', !stillB.isError && !!pageAt(`${base}/plain`), text(stillB).match(/### Result\n.*/)?.[0].replace('\n', ' '));
 
+  const closed = await call(b, 'browser_close');
+  const reopened = await call(b, 'browser_navigate', { url: `${base}/plain?reopened` });
+  const tabsReopened = text(await call(b, 'browser_tabs', { action: 'list' }));
+  const blanks = context.pages().filter(p => p.url().startsWith('about:blank#')).length;
+  check('after browser_close the next navigate opens a fresh window, no stray tabs',
+    !closed.isError && /Ready after/.test(text(reopened)) && !pageAt(`${base}/plain`) && !!pageAt(`${base}/plain?reopened`) && tabsReopened.match(/^- \d+:/gm)?.length === 1 && !blanks,
+    `${text(reopened).match(/### (Error|Page readiness)\n.*/)?.[0].replace('\n', ' ')} | blank windows ${blanks} | tabs ${tabsReopened.replace(/\n/g, ' | ').slice(0, 200)}`);
+
   const d = await connect('agent-d');
   const before = context.pages().length;
   const empty = await call(d, 'browser_tabs', { action: 'list' });
