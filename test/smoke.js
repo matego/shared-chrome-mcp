@@ -157,7 +157,8 @@ try {
   await Promise.race([exited, sleep(15000)]);
   site.close();
   // Windows Defender scans a freshly closed Chrome profile for a while; each touch while it's scanning
-  // seems to restart the scan, so unlike rmSync's own retry this waits it out untouched between tries.
+  // seems to restart the scan (rmSync's own maxRetries/retryDelay still touches it between tries and
+  // reliably failed here), so this waits it out mostly untouched between tries instead.
   for (const delay of [0, 5000, 10000, 20000, 30000]) {
     await sleep(delay);
     try { rmSync(work, { recursive: true, force: true }); break; } catch (error) { if (delay === 30000) throw error; }
